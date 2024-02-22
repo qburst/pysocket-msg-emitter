@@ -26,6 +26,7 @@ def messageListener():
 
     if topics is None:
         topics = fetch_topics(bootstrap_servers)
+        print("topics--->", topics)
     
     if not topics:
         print("No topics found.")
@@ -33,25 +34,27 @@ def messageListener():
     
     consumer.subscribe(topics)
     for data in consumer:
-        # topic = data.topic
-
-        room = ''
+        # room = ''
         print("Received message:", data.value)
         message = data.value
     
         if message:
+            rooms = message.get("rooms", [])
+            if rooms:
+                topic = data.topic
+                room = topic.split(".")[-1]
+                print("room:", room)
 
-            try:
-                # decoded_message = json.loads(data)
-                event_type = message.get("type")
-                args = message.get("args", [])
-                # namespace = message.get("namespace", "/")
-                rooms = message.get("rooms", [])
+                try:
+                    # decoded_message = json.loads(data)
+                    event_type = message.get("type")
+                    args = message.get("args", [])
+                    # namespace = message.get("namespace", "/")
+                    # rooms = message.get("rooms", [])
 
-                # Process rooms if specified
-                if rooms:
-                    for room in rooms:
-              
+                    # Process rooms if specified
+                    if room:
+
                         if event_type == "event":
 
                             socketio.emit(
@@ -60,23 +63,21 @@ def messageListener():
                                 room=room,
                                 namespace="/QB_space",
                                 )
-
-
-                        
-            except json.JSONDecodeError as e:
-                print(f"Error decoding message from Redis: {e}")
-            except Exception as e:
-                print(f"Error processing message from Redis: {e}")
+                            
+                except json.JSONDecodeError as e:
+                    print(f"Error decoding message from Redis: {e}")
+                except Exception as e:
+                    print(f"Error processing message from Redis: {e}")
 
 def fetch_topics(bootstrap_servers):
     admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
     topics = admin_client.list_topics()
-    print("topic list:", topics)
+    # print("topic list:", topics)
     return [topic for topic in topics if topic.startswith("socket.io_emitter")]
 
 def listen_to_redis_channel():
     print("redis func--------")
-    pubsub.psubscribe("socket.io#/QB_space#*")
+    pubsub.psubscribe("socket.io_emitter#/QB_space#*")
     for message in pubsub.listen():
 
         if message["type"] == "pmessage":
