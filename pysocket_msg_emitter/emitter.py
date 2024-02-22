@@ -12,10 +12,10 @@ class Emitter:
         self.key = key
         self.rooms = []
         # self.namespace = "/"
-        if namespace:
-            self.namespace = self._flatten_namespaces(namespace)
-        else:
-            self.namespace = ['/']
+        # if namespace:
+        #     self.namespace = self._flatten_namespaces(namespace)
+        # else:
+        self.namespace = []
 
         self.password = password
 
@@ -56,9 +56,9 @@ class Emitter:
         self.rooms.extend(rooms)
         return self
 
-    def of_namespace(self, namespace):
+    def of_namespace(self, *namespaces):
         """Includes the namespace to the namespace list"""
-        self.namespace = namespace
+        self.namespace.extend(namespaces)
         return self
     
     def off_namespace(self, namespace):
@@ -76,15 +76,22 @@ class Emitter:
             self._emit_redis(event, *args, **kwargs)
 
     def _emit_kafka(self, event, *args, **kwargs):
-        message, rooms, namespaces = self._create_message(event, *args, **kwargs)
+        if not self.namespace:
+            self.namespace = ['/']
+        namespaces = list(set(self._flatten_list(self.namespace)))
+        print("namespaces:", namespaces)
         for __namespace in namespaces:
+            message, rooms = self._create_message(event, __namespace, *args, **kwargs)
+            # for __namespace in namespaces:
             if __namespace.startswith("/"):
                 __namespace = __namespace.split("/")[-1]
+                # print("np without / :", _namespace)
             topic = f"{self.key}.{__namespace}"
             if rooms:
                 for room in rooms:
                     room_topic = f"{topic}.{room}"
                     print("topic:", room_topic)
+                    # print(message)
                     self.producer.send(room_topic, message)
                     self.producer.flush()
             else:
@@ -93,8 +100,13 @@ class Emitter:
         self.rooms = []
 
     def _emit_redis(self, event, *args, **kwargs):
-        message, rooms, namespaces = self._create_message(event, *args, **kwargs)
+        if not self.namespace:
+            self.namespace = ['/']
+        namespaces = list(set(self._flatten_list(self.namespace)))
+        print("namespaces:", namespaces)
         for __namespace in namespaces:
+            message, rooms = self._create_message(event, __namespace, *args, **kwargs)
+            # for __namespace in namespaces:
             channel = f"{self.key}#{__namespace}#"
             if rooms:
                 for room in rooms:
@@ -105,22 +117,22 @@ class Emitter:
                 self.redis_client.publish(channel, json.dumps(message))
         self.rooms = []
 
-    def _create_message(self, event, *args, **kwargs):
-        # flattened_rooms = list(set(self._flatten_rooms(self.rooms)))
+    def _create_message(self, event, __namespace, *args, **kwargs):
+        # flattened_rooms = list(set(self._flatten_list(self.rooms)))
         # Initialize the message with potential text or base64-encoded binary data
 
-        try:
-            if kwargs['namespace']:
-                namespaces = self._flatten_namespaces(kwargs['namespace'])
-        except:
-            namespaces = self.namespace
-            print(namespaces)
+        # try:
+        #     if kwargs['namespace']:
+        #         namespaces = self._flatten_namespaces(kwargs['namespace'])
+        # except:
+        #     namespaces = self.namespace
+        #     print(namespaces)
 
         try:
             if kwargs['room']:
                 rooms = kwargs['room']
         except:
-            rooms = list(set(self._flatten_rooms(self.rooms)))
+            rooms = list(set(self._flatten_list(self.rooms)))
 
         # for __namespace in namespaces:
         #     message = {
@@ -136,8 +148,9 @@ class Emitter:
             "event": event,
             "args": [],
             "rooms": rooms,
-            "namespace": namespaces,
+            "namespace": __namespace,
         }
+        # print(message)
 
         for arg in args:
             if isinstance(arg, bytes):
@@ -151,9 +164,9 @@ class Emitter:
                 # Convert everything else to a string to ensure JSON serialization
                 message["args"].append(str(arg))
 
-        return message, rooms, namespaces
+        return message, rooms
     
-    def _flatten_rooms(self, room_list):
+    def _flatten_list(self, room_list):
         """Flatten a list of rooms."""
         flattened_rooms = []
         for item in room_list:

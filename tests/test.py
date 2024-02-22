@@ -16,9 +16,12 @@ def main():
     )
 
     # Emit a message to room1 via Kafka
-    kafka_emitter.of_namespace("/QB_space").in_room("room1").emit(
+    kafka_emitter.of_namespace("/QB_space").in_room("room1","room2").emit(
         "my_event", {"data": "Hello from Kafka to room1"}
     )
+    # kafka_emitter.of_namespace("/QB_space").in_room("room1").emit(
+    #     "my_event", {"data": "Hello from Kafka to room1"}
+    # )
 
     # Emit a message to multiple rooms via Kafka
     # kafka_emitter.of_namespace("/QB_space").in_room("room2", "room3").emit(
@@ -35,12 +38,12 @@ def main():
         engine="redis",
         host="localhost",
         port=6379,
-        key="socket.io",
+        key="socket.io_emitter",
         password=None,  # Assume no password is set for Redis
     )
 
     # Emit a message to room1 via Redis
-    redis_emitter.of_namespace("/QB_space").in_room("room1").emit(
+    redis_emitter.of_namespace("/QB_space").in_room("room1", "room2").emit(
         "my_event", {"data": "Hello from Redis to room1"}
     )
     # redis_emitter.of_namespace("/QB_space").in_room("room1").emit(
