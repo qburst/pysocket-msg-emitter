@@ -28,10 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
         messagesDiv.innerHTML += `<p>Binary Event: ${data.data}</p>`;
     });
 
-    socket.on('text_event', (data) => {
-        console.log('Redis Text Event Received:', data.data);
-        messagesDiv.innerHTML += `<p>Redis Text Event: ${data.data}</p>`;
-    });
+    
 
     socket.on('json_event', (data) => {
         console.log('JSON Event Received:', data.data);
@@ -39,7 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // Process JSON data here
     });
 
-    socket.on('broadcast', (data) => {
+    socket.on('broadcast_event', (data) => {
+        console.log('Broadcast message Received:', data.data);
+        messagesDiv.innerHTML += `<p>Broadcast Event: ${data.data}</p>`;
+    });
+    socket.on('json_broadcast_event', (data) => {
         console.log('Broadcast message Received:', data.data);
         messagesDiv.innerHTML += `<p>Broadcast Event: ${data.data}</p>`;
     });
@@ -50,8 +51,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     socket.on('kafka_event', (data) => {
-        console.log('Kafka Text Event Received:', data.data);
-        messagesDiv.innerHTML += `<p>Kafka Text Event: ${data.data}</p>`;
+        console.log('Kafka Text Event Received:', data);
+        messagesDiv.innerHTML += `<p>Kafka Text Event: ${JSON.stringify(data)}</p>`;
+    });
+    
+    socket.on('text_event', (data) => {
+        console.log('Redis Text Event Received:', data);
+        messagesDiv.innerHTML += `<p>Redis Text Event: ${JSON.stringify(data)}</p>`;
     });
 
     socket.on('join_success', (data) => {
