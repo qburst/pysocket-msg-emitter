@@ -5,7 +5,15 @@ from kafka import KafkaProducer
 
 
 class Emitter:
-    def __init__(self, engine, host=None, port=None, namespace=[], key="socket.io_emitter",password=None):
+    def __init__(
+        self,
+        engine,
+        host=None,
+        port=None,
+        namespace=[],
+        key="socket.io_emitter",
+        password=None,
+    ):
         self.engine = engine
         self.host = host
         self.port = port
@@ -32,7 +40,7 @@ class Emitter:
         if self.port is None:
             self.port = "9092"
 
-        bootstrap_server=f"{self.host}:{self.port}"
+        bootstrap_server = f"{self.host}:{self.port}"
 
         print("bootstrap: ", bootstrap_server)
 
@@ -43,7 +51,7 @@ class Emitter:
 
     def _init_redis(self):
         if self.host is None:
-            self.host = 'localhost'
+            self.host = "localhost"
         if self.port is None:
             self.port = 6379
 
@@ -60,11 +68,11 @@ class Emitter:
         """Includes the namespace to the namespace list"""
         self.namespace.extend(namespaces)
         return self
-    
+
     def off_namespace(self, namespace):
         """Removes namespace given from the namespace list"""
         try:
-            self.namespace.remove("/"+namespace)
+            self.namespace.remove("/" + namespace)
         finally:
             return self
 
@@ -77,7 +85,7 @@ class Emitter:
 
     def _emit_kafka(self, event, *args, **kwargs):
         if not self.namespace:
-            self.namespace = ['/']
+            self.namespace = ["/"]
         namespaces = list(set(self._flatten_list(self.namespace)))
         print("namespaces:", namespaces)
         for __namespace in namespaces:
@@ -96,12 +104,13 @@ class Emitter:
                     self.producer.flush()
             else:
                 self.producer.send(topic, message)
+                print(message)
                 self.producer.flush()
         self.rooms = []
 
     def _emit_redis(self, event, *args, **kwargs):
         if not self.namespace:
-            self.namespace = ['/']
+            self.namespace = ["/"]
         namespaces = list(set(self._flatten_list(self.namespace)))
         print("namespaces:", namespaces)
         for __namespace in namespaces:
@@ -129,8 +138,8 @@ class Emitter:
         #     print(namespaces)
 
         try:
-            if kwargs['room']:
-                rooms = kwargs['room']
+            if kwargs["room"]:
+                rooms = kwargs["room"]
         except:
             rooms = list(set(self._flatten_list(self.rooms)))
 
@@ -165,7 +174,7 @@ class Emitter:
                 message["args"].append(str(arg))
 
         return message, rooms
-    
+
     def _flatten_list(self, room_list):
         """Flatten a list of rooms."""
         flattened_rooms = []
@@ -175,7 +184,7 @@ class Emitter:
             else:
                 flattened_rooms.append(item)
         return flattened_rooms
-    
+
     def _flatten_namespaces(self, namespaces):
         """Makes given string list to namespaces list"""
-        return ["/"+np for np in namespaces]
+        return ["/" + np for np in namespaces]

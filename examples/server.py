@@ -2,44 +2,49 @@ from flask import Flask, render_template, request
 from flask_socketio import SocketIO, emit, join_room
 import redis
 import json
-import base64
 import threading
 from flask_cors import CORS
 from kafka import KafkaConsumer, KafkaAdminClient
+import base64
 
 app = Flask(__name__)
-CORS(app)  #  enable CORS for all routes
+CORS(app)  # Enable CORS for all routes
 app.config["SECRET_KEY"] = "secret!"
 socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=True)
 
 redis_client = redis.StrictRedis(host="localhost", port=6379, db=0)
 pubsub = redis_client.pubsub()
 
-bootstrap_servers = bootstrap_servers="localhost:9092"
+bootstrap_servers = "localhost:9092"  # Removed duplicate variable assignment
 consumer = KafkaConsumer(
-        bootstrap_servers=bootstrap_servers,
-        value_deserializer=lambda m: json.loads(m.decode("utf-8")),
-    )
+    bootstrap_servers=[bootstrap_servers],
+    value_deserializer=lambda m: json.loads(m.decode("utf-8")),
+    group_id="socketio_group",  # Ensure consumers are part of the same group
+    auto_offset_reset="latest",  # Start reading at the latest message
+)
+
 
 def messageListener():
-    topics=None
+    topics = None
 
     if topics is None:
         topics = fetch_topics(bootstrap_servers)
         print("topics--->", topics)
-    
+
     if not topics:
         print("No topics found.")
         return
-    
+
     consumer.subscribe(topics)
     for data in consumer:
         # room = ''
         print("Received message:", data.value)
         message = data.value
-    
+
         if message:
             rooms = message.get("rooms", [])
+            if not rooms:
+                print("hi")
             if rooms:
                 topic = data.topic
                 room = topic.split(".")[-1]
@@ -48,26 +53,37 @@ def messageListener():
                 try:
                     # decoded_message = json.loads(data)
                     event_type = message.get("type")
+                    event = message.get("event")
                     args = message.get("args", [])
                     # namespace = message.get("namespace", "/")
                     # rooms = message.get("rooms", [])
-
+                    print("yfuyggu", event)
                     # Process rooms if specified
                     if room:
 
-                        if event_type == "event":
+                        if event == "my_event":
 
                             socketio.emit(
                                 "kafka_event",
                                 {"data": args},
                                 room=room,
                                 namespace="/QB_space",
-                                )
-                            
-                except json.JSONDecodeError as e:
-                    print(f"Error decoding message from Redis: {e}")
+                            )
+                        elif event == "binary_event":
+                            socketio.emit(
+                                "kafkabinary_event",
+                                {"data": args},
+                                room=room,
+                                namespace="/QB_space",
+                            )
+                    else:
+                        print("USGvdsgvihdsvihfvhsdfhvbshjdfvinside", event)
+                        # Broadcast to all clients in the specified namespace
+                        print(f"Broadcasting {event} in namespace: /QB_space")
+                        socketio.emit(event, {"data": args}, namespace="/QB_space")
                 except Exception as e:
                     print(f"Error processing message from Redis: {e}")
+
 
 def fetch_topics(bootstrap_servers):
     admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
@@ -75,14 +91,15 @@ def fetch_topics(bootstrap_servers):
     # print("topic list:", topics)
     return [topic for topic in topics if topic.startswith("socket.io_emitter")]
 
+
 def listen_to_redis_channel():
     print("redis func--------")
     pubsub.psubscribe("socket.io_emitter#/QB_space#*")
     for message in pubsub.listen():
 
         if message["type"] == "pmessage":
-            channel = message['channel'].decode('utf-8')
-            room = ''
+            channel = message["channel"].decode("utf-8")
+            room = ""
 
             if len(channel.split("#")) == 4:
                 room = channel.split("#")[2]
@@ -94,12 +111,14 @@ def listen_to_redis_channel():
                 try:
                     decoded_message = json.loads(data)
                     event_type = decoded_message.get("type")
+                    event = decoded_message.get("event")
                     args = decoded_message.get("args", [])
                     namespace = decoded_message.get("namespace", "/")
+                    print("chkjkhg", event)
 
                     # Process rooms if specified
                     if room:
-                        if event_type == "binary_event":
+                        if event == "binary_event":
 
                             # Handle binary event
                             binary_data = base64.b64decode(args[0]["data"]).decode(
@@ -111,7 +130,7 @@ def listen_to_redis_channel():
                                 room=room,
                                 namespace=namespace,
                             )
-                        elif event_type == "event":
+                        elif event == "my_event":
                             # Handle text event
                             socketio.emit(
                                 "text_event",
@@ -150,13 +169,13 @@ def listen_to_redis_channel():
                                     {"data": binary_data},
                                     namespace=namespace,
                                 )
-                            
+
                 except json.JSONDecodeError as e:
                     print(f"Error decoding message from Redis: {e}")
                 except Exception as e:
                     print(f"Error processing message from Redis: {e}")
 
-    
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -200,5 +219,5 @@ if __name__ == "__main__":
     kafka_thread.start()
     redis_thread = threading.Thread(target=listen_to_redis_channel)
     redis_thread.start()
-    
+
     socketio.run(app, debug=False, host="0.0.0.0")
