@@ -29,7 +29,7 @@ def messageListener():
 
     if topics is None:
         topics = fetch_topics(bootstrap_servers)
-        print("topics--->", topics)
+        print("topics: ", topics)
 
     if not topics:
         print("No topics found.")
@@ -37,63 +37,57 @@ def messageListener():
 
     consumer.subscribe(topics)
     for data in consumer:
-        # room = ''
         print("Received message:", data.value)
         message = data.value
 
         if message:
             rooms = message.get("rooms", [])
-            if not rooms:
-                print("hi")
-            if rooms:
-                topic = data.topic
-                room = topic.split(".")[-1]
-                print("room:", room)
+            event = message.get("event")
+            args = message.get("args", [])
+            namespace = message.get("namespace", "/")
 
-                try:
-                    # decoded_message = json.loads(data)
-                    event_type = message.get("type")
-                    event = message.get("event")
-                    args = message.get("args", [])
-                    # namespace = message.get("namespace", "/")
-                    # rooms = message.get("rooms", [])
-                    print("yfuyggu", event)
+            try:     
+                if rooms:
+                    topic = data.topic
+                    room = topic.split(".")[-1]
+                    print("room:", room)
+
                     # Process rooms if specified
                     if room:
-
                         if event == "my_event":
-
                             socketio.emit(
                                 "kafka_event",
                                 {"data": args},
                                 room=room,
-                                namespace="/QB_space",
+                                namespace=namespace,
                             )
+
                         elif event == "binary_event":
                             socketio.emit(
                                 "kafkabinary_event",
                                 {"data": args},
                                 room=room,
-                                namespace="/QB_space",
+                                namespace=namespace,
                             )
-                    else:
-                        print("USGvdsgvihdsvihfvhsdfhvbshjdfvinside", event)
-                        # Broadcast to all clients in the specified namespace
-                        print(f"Broadcasting {event} in namespace: /QB_space")
-                        socketio.emit(event, {"data": args}, namespace="/QB_space")
-                except Exception as e:
-                    print(f"Error processing message from Redis: {e}")
+        
+                else:
+                    if event == "broadcast_event_kafka":
+                                socketio.emit(
+                                    "broadcast_event_kafka",
+                                    {"data": args},
+                                    namespace = namespace,
+                                )
+            except Exception as e:
+                print(f"Error processing message from Redis: {e}")
 
 
 def fetch_topics(bootstrap_servers):
     admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
     topics = admin_client.list_topics()
-    # print("topic list:", topics)
     return [topic for topic in topics if topic.startswith("socket.io_emitter")]
 
 
 def listen_to_redis_channel():
-    print("redis func--------")
     pubsub.psubscribe("socket.io_emitter#/QB_space#*")
     for message in pubsub.listen():
 
@@ -105,7 +99,6 @@ def listen_to_redis_channel():
                 room = channel.split("#")[2]
 
             data = message["data"]
-            # print("receiveddata", data)
             if data:
 
                 try:
@@ -114,7 +107,6 @@ def listen_to_redis_channel():
                     event = decoded_message.get("event")
                     args = decoded_message.get("args", [])
                     namespace = decoded_message.get("namespace", "/")
-                    print("chkjkhg", event)
 
                     # Process rooms if specified
                     if room:
