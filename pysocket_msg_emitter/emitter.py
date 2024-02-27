@@ -8,7 +8,6 @@ class Emitter:
         engine,
         host=None,
         port=None,
-        namespace=[],
         key="socket.io_emitter",
         password=None,
     ):
@@ -17,22 +16,15 @@ class Emitter:
         self.port = port
         self.key = key
         self.rooms = []
-        # self.namespace = "/"
-        # if namespace:
-        #     self.namespace = self._flatten_namespaces(namespace)
-        # else:
         self.namespace = []
-
         self.password = password
 
         if self.engine == "kafka":
             from kafka import KafkaProducer
             self._init_kafka(KafkaProducer)
-            # self._init_kafka()
         elif self.engine == "redis":
             import redis
             self._init_redis(redis.StrictRedis)
-            # self._init_redis()
         else:
             raise ValueError("Please use 'redis' or 'kafka'.")
 
@@ -78,30 +70,27 @@ class Emitter:
         finally:
             return self
 
-    def emit(self, event, *args, **kwargs):
+    def emit(self, event, msg):
         """Emit an event with optional arguments to the specified rooms."""
         if self.engine == "kafka":
-            self._emit_kafka(event, *args, **kwargs)
+            self._emit_kafka(event, msg)
         elif self.engine == "redis":
-            self._emit_redis(event, *args, **kwargs)
+            self._emit_redis(event, msg)
 
-    def _emit_kafka(self, event, *args, **kwargs):
+    def _emit_kafka(self, event, msg):
         if not self.namespace:
             self.namespace = ["/"]
         namespaces = list(set(self._flatten_list(self.namespace)))
         print("namespaces:", namespaces)
         for __namespace in namespaces:
-            message, rooms = self._create_message(event, __namespace, *args, **kwargs)
-            # for __namespace in namespaces:
+            message, rooms = self._create_message(event, __namespace, msg)
             if __namespace.startswith("/"):
                 __namespace = __namespace.split("/")[-1]
-                # print("np without / :", _namespace)
             topic = f"{self.key}.{__namespace}"
             if rooms:
                 for room in rooms:
                     room_topic = f"{topic}.{room}"
                     print("topic:", room_topic)
-                    # print(message)
                     self.producer.send(room_topic, message)
                     self.producer.flush()
             else:
@@ -110,14 +99,13 @@ class Emitter:
                 self.producer.flush()
         self.rooms = []
 
-    def _emit_redis(self, event, *args, **kwargs):
+    def _emit_redis(self, event, msg):
         if not self.namespace:
             self.namespace = ["/"]
         namespaces = list(set(self._flatten_list(self.namespace)))
         print("namespaces:", namespaces)
         for __namespace in namespaces:
-            message, rooms = self._create_message(event, __namespace, *args, **kwargs)
-            # for __namespace in namespaces:
+            message, rooms = self._create_message(event, __namespace, msg)
             channel = f"{self.key}#{__namespace}#"
             if rooms:
                 for room in rooms:
@@ -128,52 +116,31 @@ class Emitter:
                 self.redis_client.publish(channel, json.dumps(message))
         self.rooms = []
 
-    def _create_message(self, event, __namespace, *args, **kwargs):
-        # flattened_rooms = list(set(self._flatten_list(self.rooms)))
-        # Initialize the message with potential text or base64-encoded binary data
-
-        # try:
-        #     if kwargs['namespace']:
-        #         namespaces = self._flatten_namespaces(kwargs['namespace'])
-        # except:
-        #     namespaces = self.namespace
-        #     print(namespaces)
-
-        try:
-            if kwargs["room"]:
-                rooms = kwargs["room"]
-        except:
-            rooms = list(set(self._flatten_list(self.rooms)))
-
-        # for __namespace in namespaces:
-        #     message = {
-        #         "type": "event",  # Default type, might be overridden by binary or json
-        #         "event": event,
-        #         "args": [],
-        #         "rooms": rooms,
-        #         "namespace": __namespace
-        #     }
+    def _create_message(self, event, __namespace, msg):
+        print("msg: ", msg)
+        print("msg: ", type(msg))
+        
+        rooms = list(set(self._flatten_list(self.rooms)))
 
         message = {
             "type": "event",
             "event": event,
-            "args": [],
+            "msg": [],
             "rooms": rooms,
             "namespace": __namespace,
         }
-        # print(message)
 
-        for arg in args:
-            if isinstance(arg, bytes):
+        if msg:
+            if isinstance(msg, bytes):
                 # Base64-encode binary data and indicate that it's binary
-                encoded_binary = base64.b64encode(arg).decode("utf-8")
-                message["args"].append({"_is_binary": True, "data": encoded_binary})
-            elif isinstance(arg, dict) or isinstance(arg, list):
+                encoded_binary = base64.b64encode(msg).decode("utf-8")
+                message["msg"].append({"_is_binary": True, "data": encoded_binary})
+            elif isinstance(msg, dict) or isinstance(msg, list):
                 # Directly append JSON-serializable structures
-                message["args"].append(arg)
+                message["msg"].append(msg)
             else:
                 # Convert everything else to a string to ensure JSON serialization
-                message["args"].append(str(arg))
+                message["msg"].append(str(msg))
 
         return message, rooms
 
