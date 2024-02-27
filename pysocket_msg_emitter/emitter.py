@@ -117,9 +117,6 @@ class Emitter:
         self.rooms = []
 
     def _create_message(self, event, __namespace, msg):
-        print("msg: ", msg)
-        print("msg: ", type(msg))
-        
         rooms = list(set(self._flatten_list(self.rooms)))
 
         message = {
