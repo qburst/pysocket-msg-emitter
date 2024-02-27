@@ -1,4 +1,6 @@
 LICENSE
+MANIFEST.in
+README.md
 setup.py
 pysocket_msg_emitter/__init__.py
 pysocket_msg_emitter/emitter.py
