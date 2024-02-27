@@ -1,7 +1,5 @@
 import json
 import base64
-import redis
-from kafka import KafkaProducer
 
 
 class Emitter:
@@ -28,13 +26,17 @@ class Emitter:
         self.password = password
 
         if self.engine == "kafka":
-            self._init_kafka()
+            from kafka import KafkaProducer
+            self._init_kafka(KafkaProducer)
+            # self._init_kafka()
         elif self.engine == "redis":
-            self._init_redis()
+            import redis
+            self._init_redis(redis.StrictRedis)
+            # self._init_redis()
         else:
             raise ValueError("Please use 'redis' or 'kafka'.")
 
-    def _init_kafka(self):
+    def _init_kafka(self, KafkaProducer):
         if self.host is None:
             self.host = "localhost"
         if self.port is None:
@@ -49,13 +51,13 @@ class Emitter:
             value_serializer=lambda m: json.dumps(m).encode("utf-8"),
         )
 
-    def _init_redis(self):
+    def _init_redis(self, StrictRedis):
         if self.host is None:
             self.host = "localhost"
         if self.port is None:
             self.port = 6379
 
-        self.redis_client = redis.StrictRedis(
+        self.redis_client = StrictRedis(
             host=self.host, port=self.port, password=self.password
         )
 
