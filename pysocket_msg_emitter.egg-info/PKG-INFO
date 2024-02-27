@@ -9,8 +9,10 @@ Classifier: License :: OSI Approved :: MIT License
 Classifier: Operating System :: OS Independent
 Description-Content-Type: text/markdown
 License-File: LICENSE
-Requires-Dist: redis>=3.5.3
-Requires-Dist: kafka-python>=2.0.2
+Provides-Extra: kafka
+Requires-Dist: kafka-python>=2.0.2; extra == "kafka"
+Provides-Extra: redis
+Requires-Dist: redis>=3.5.3; extra == "redis"
 
 # PySocket-msg-emitter
 
