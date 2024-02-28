@@ -1,6 +1,0 @@
-
-[kafka]
-kafka-python>=2.0.2
-
-[redis]
-redis>=3.5.3
