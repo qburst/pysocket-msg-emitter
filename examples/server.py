@@ -15,7 +15,7 @@ socketio = SocketIO(app, cors_allowed_origins="*", logger=True, engineio_logger=
 redis_client = redis.StrictRedis(host="localhost", port=6379, db=0)
 pubsub = redis_client.pubsub()
 
-bootstrap_servers = "localhost:9092"  # Removed duplicate variable assignment
+bootstrap_servers = "localhost:9092"
 consumer = KafkaConsumer(
     bootstrap_servers=[bootstrap_servers],
     value_deserializer=lambda m: json.loads(m.decode("utf-8")),
@@ -43,7 +43,7 @@ def messageListener():
         if message:
             rooms = message.get("rooms", [])
             event = message.get("event")
-            args = message.get("args", [])
+            msg = message.get("msg", [])
             namespace = message.get("namespace", "/")
 
             try:     
@@ -57,7 +57,7 @@ def messageListener():
                         if event == "my_event":
                             socketio.emit(
                                 "kafka_event",
-                                {"data": args},
+                                {"data": msg},
                                 room=room,
                                 namespace=namespace,
                             )
@@ -65,7 +65,7 @@ def messageListener():
                         elif event == "binary_event":
                             socketio.emit(
                                 "kafkabinary_event",
-                                {"data": args},
+                                {"data": msg},
                                 room=room,
                                 namespace=namespace,
                             )
@@ -74,7 +74,7 @@ def messageListener():
                     if event == "broadcast_event_kafka":
                                 socketio.emit(
                                     "broadcast_event_kafka",
-                                    {"data": args},
+                                    {"data": msg},
                                     namespace = namespace,
                                 )
             except Exception as e:
@@ -105,7 +105,7 @@ def listen_to_redis_channel():
                     decoded_message = json.loads(data)
                     event_type = decoded_message.get("type")
                     event = decoded_message.get("event")
-                    args = decoded_message.get("args", [])
+                    msg = decoded_message.get("msg", [])
                     namespace = decoded_message.get("namespace", "/")
 
                     # Process rooms if specified
@@ -113,7 +113,7 @@ def listen_to_redis_channel():
                         if event == "binary_event":
 
                             # Handle binary event
-                            binary_data = base64.b64decode(args[0]["data"]).decode(
+                            binary_data = base64.b64decode(msg[0]["data"]).decode(
                                 "utf-8"
                             )
                             socketio.emit(
@@ -126,34 +126,33 @@ def listen_to_redis_channel():
                             # Handle text event
                             socketio.emit(
                                 "text_event",
-                                {"data": args},
+                                {"data": msg},
                                 room=room,
                                 namespace=namespace,
                             )
-                            # Add handling for JSON events if needed
 
                     # Handle broadcast events separately
                     else:
                         if event_type == "event":
-                            if args and isinstance(args[0], dict):  # JSON data
+                            if msg and isinstance(msg[0], dict):  # JSON data
                                 # Emit JSON broadcast event
                                 socketio.emit(
                                     "json_broadcast_event",
-                                    args[0],
+                                    msg[0],
                                     namespace=namespace,
                                 )
                             else:
                                 # Emit text broadcast event
                                 socketio.emit(
                                     "broadcast",
-                                    {"data": args},
+                                    {"data": msg},
                                     namespace=namespace,
                                 )
 
                         elif event_type == "binary_event":
-                            if args[0].get("_is_binary"):
+                            if msg[0].get("_is_binary"):
                                 # Emit binary broadcast event
-                                binary_data = base64.b64decode(args[0]["data"]).decode(
+                                binary_data = base64.b64decode(msg[0]["data"]).decode(
                                     "utf-8"
                                 )
                                 socketio.emit(
@@ -176,7 +175,6 @@ def index():
 @socketio.on("connect", namespace="/QB_space")
 def test_connect():
     print(f"Client connected, emitting test_event, SID: {request.sid}")
-    # emit("broadcast", {"data": "Broadcast: Hello from server!"}, broadcast=True)
     emit("test_event", {"data": "Hello World!...Client Connected"})
 
 
