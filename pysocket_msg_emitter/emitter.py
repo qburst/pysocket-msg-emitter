@@ -36,8 +36,6 @@ class Emitter:
 
         bootstrap_server = f"{self.host}:{self.port}"
 
-        print("bootstrap: ", bootstrap_server)
-
         self.producer = KafkaProducer(
             bootstrap_servers=[bootstrap_server],
             value_serializer=lambda m: json.dumps(m).encode("utf-8"),
@@ -72,21 +70,21 @@ class Emitter:
 
     def emit(self, event, msg):
         """Emit an event with optional arguments to the specified rooms."""
-        if self.engine == "kafka":
-            self._emit_kafka(event, msg)
-        elif self.engine == "redis":
-            self._emit_redis(event, msg)
-
-    def _emit_kafka(self, event, msg):
         if not self.namespace:
             self.namespace = ["/"]
         namespaces = list(set(self._flatten_list(self.namespace)))
-        print("namespaces:", namespaces)
-        for __namespace in namespaces:
-            message, rooms = self._create_message(event, __namespace, msg)
-            if __namespace.startswith("/"):
-                __namespace = __namespace.split("/")[-1]
-            topic = f"{self.key}.{__namespace}"
+
+        if self.engine == "kafka":
+            self._emit_kafka(event, msg, namespaces)
+        elif self.engine == "redis":
+            self._emit_redis(event, msg, namespaces)
+
+    def _emit_kafka(self, event, msg, namespaces):
+        for namespace in namespaces:
+            message, rooms = self._create_message(event, namespace, msg)
+            if namespace.startswith("/"):
+                namespace = namespace.split("/")[-1]
+            topic = f"{self.key}.{namespace}"
             if rooms:
                 for room in rooms:
                     room_topic = f"{topic}.{room}"
@@ -95,18 +93,13 @@ class Emitter:
                     self.producer.flush()
             else:
                 self.producer.send(topic, message)
-                print(message)
                 self.producer.flush()
         self.rooms = []
 
-    def _emit_redis(self, event, msg):
-        if not self.namespace:
-            self.namespace = ["/"]
-        namespaces = list(set(self._flatten_list(self.namespace)))
-        print("namespaces:", namespaces)
-        for __namespace in namespaces:
-            message, rooms = self._create_message(event, __namespace, msg)
-            channel = f"{self.key}#{__namespace}#"
+    def _emit_redis(self, event, msg, namespaces):
+        for namespace in namespaces:
+            message, rooms = self._create_message(event, namespace, msg)
+            channel = f"{self.key}#{namespace}#"
             if rooms:
                 for room in rooms:
                     room_channel = f"{channel}{room}#"
@@ -116,7 +109,7 @@ class Emitter:
                 self.redis_client.publish(channel, json.dumps(message))
         self.rooms = []
 
-    def _create_message(self, event, __namespace, msg):
+    def _create_message(self, event, namespace, msg):
         rooms = list(set(self._flatten_list(self.rooms)))
 
         message = {
@@ -124,7 +117,7 @@ class Emitter:
             "event": event,
             "msg": [],
             "rooms": rooms,
-            "namespace": __namespace,
+            "namespace": namespace,
         }
 
         if msg:
@@ -141,15 +134,15 @@ class Emitter:
 
         return message, rooms
 
-    def _flatten_list(self, room_list):
-        """Flatten a list of rooms."""
-        flattened_rooms = []
-        for item in room_list:
+    def _flatten_list(self, list_items):
+        """Flatten the list of items."""
+        flattened_list = []
+        for item in list_items:
             if isinstance(item, list):
-                flattened_rooms.extend(item)
+                flattened_list.extend(item)
             else:
-                flattened_rooms.append(item)
-        return flattened_rooms
+                flattened_list.append(item)
+        return flattened_list
 
     def _flatten_namespaces(self, namespaces):
         """Makes given string list to namespaces list"""
