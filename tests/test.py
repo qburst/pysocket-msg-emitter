@@ -75,6 +75,16 @@ def main():
 
     print("Messages have been emitted to both Redis and Kafka.")
 
+    # Using postgresql as engine of emitter
+    postgresql_emitter = Emitter(
+        engine = 'postgresql',
+        host = 'localhost',
+        port = 5432,
+        key = 'socket.io_emitter',
+        db_user = 'postgres',
+        db_password = 'postgres',
+        db_name = 'SocketMessageBroker'
+    )
 
 if __name__ == "__main__":
     main()
