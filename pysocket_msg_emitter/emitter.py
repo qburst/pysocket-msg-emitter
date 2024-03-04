@@ -72,7 +72,8 @@ class Emitter:
         """Emit an event with optional arguments to the specified rooms."""
         if not self.namespace:
             self.namespace = ["/"]
-        namespaces = list(set(self._flatten_list(self.namespace)))
+        namespaces_lst = list(set(self._flatten_list(self.namespace)))
+        namespaces = self._flatten_namespaces(namespaces_lst)
 
         if self.engine == "kafka":
             self._emit_kafka(event, msg, namespaces)
@@ -94,7 +95,7 @@ class Emitter:
             else:
                 self.producer.send(topic, message)
                 self.producer.flush()
-        self.rooms = []
+        self.rooms, self.namespace = []
 
     def _emit_redis(self, event, msg, namespaces):
         for namespace in namespaces:
@@ -107,7 +108,7 @@ class Emitter:
                     self.redis_client.publish(room_channel, json.dumps(message))
             else:
                 self.redis_client.publish(channel, json.dumps(message))
-        self.rooms = []
+        self.rooms, self.namespace = []
 
     def _create_message(self, event, namespace, msg):
         rooms = list(set(self._flatten_list(self.rooms)))
@@ -146,4 +147,4 @@ class Emitter:
 
     def _flatten_namespaces(self, namespaces):
         """Makes given string list to namespaces list"""
-        return ["/" + np for np in namespaces]
+        return ["/" + ns if not ns.startswith("/") else ns for ns in namespaces]
