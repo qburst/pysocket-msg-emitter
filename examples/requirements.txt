@@ -3,3 +3,4 @@ flask
 flask-socketiO
 flask-cors
 kafka-python
+psycopg2-binary

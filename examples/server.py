@@ -24,6 +24,18 @@ consumer = KafkaConsumer(
 )
 
 
+conn = psycopg2.connect(
+    dbname = "SocketMessageBroker",
+    user = "postgres",
+    password = "postgres",
+    host = "localhost",
+    port = 5432
+)
+cur = conn.cursor()
+cur.execute("LISTEN test_channel;")
+conn.commit()
+
+
 def messageListener():
     topics = None
 
@@ -166,6 +178,47 @@ def listen_to_redis_channel():
                 except Exception as e:
                     print(f"Error processing message from Redis: {e}")
 
+def listen_db_notifications():
+
+    while True:
+        conn.poll()
+        # print(conn.poll())
+        if conn.notifies:
+            print("-----------------------------")
+            notify = conn.notifies.pop(0)
+            print("Received notification on channel {}: {}".format(notify.channel, notify.payload))
+            cur.execute("SELECT * FROM messages;")
+            rows = cur.fetchall()
+            for row in rows:
+                print(row)
+                namespace = row[1]
+                room = row[2]
+                r_text_arg = row[3]
+                r_json_arg = row[4]
+                try:
+                    if r_json_arg.get('is_binary', False):
+                        binary_data = base64.b64decode(r_json_arg["data"]).decode("utf-8")
+                        if room:
+                            send_room_event("binary_event", binary_data, room, namespace)
+                        else:
+                            send_broadcast('binary_broadcast_event',binary_data, namespace)
+                    elif r_json_arg:
+                        if room:
+                            send_room_event("json_event", r_json_arg,room,namespace)
+                        else:
+                            send_broadcast('json_broadcast_event',r_json_arg,namespace)
+                    else:
+                        if room:
+                            send_room_event('text_event', r_text_arg,room,namespace)
+                        else:
+                            send_broadcast('broadcast',r_text_arg,namespace)
+
+                    cur.execute("DELETE FROM messages where id="+str(row[0])+";")
+                    conn.commit()
+                except:
+                    pass
+
+            cur.close()
 
 @app.route("/")
 def index():
@@ -209,5 +262,7 @@ if __name__ == "__main__":
     kafka_thread.start()
     redis_thread = threading.Thread(target=listen_to_redis_channel)
     redis_thread.start()
+    postgresql_thread = threading.Thread(target=listen_db_notifications)
+    postgresql_thread.start()
 
     socketio.run(app, debug=False, host="0.0.0.0")
