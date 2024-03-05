@@ -36,7 +36,7 @@ class Emitter:
             import psycopg2
             self._init_postgresql(psycopg2)
         else:
-            raise ValueError("Please use 'redis' or 'kafka'.")
+            raise ValueError("Please use 'redis', 'kafka' or postgresql.")
 
     def _init_kafka(self, KafkaProducer):
         if self.host is None:
@@ -119,15 +119,6 @@ class Emitter:
 
     def emit(self, event, msg):
         """Emit an event with optional arguments to the specified rooms."""
-        if self.engine == "kafka":
-            self._emit_kafka(event, msg)
-        elif self.engine == "redis":
-            self._emit_redis(event, msg)
-        elif self.engine == "postgresql":
-            self._emit_postgresql(event, msg)
-
-
-    def _emit_kafka(self, event, msg):
         if not self.namespace:
             self.namespace = ["/"]
         namespaces_lst = list(set(self._flatten_list(self.namespace)))
@@ -137,6 +128,8 @@ class Emitter:
             self._emit_kafka(event, msg, namespaces)
         elif self.engine == "redis":
             self._emit_redis(event, msg, namespaces)
+        elif self.engine == "postgresql":
+            self._emit_postgresql(event, msg, namespaces)
 
     def _emit_kafka(self, event, msg, namespaces):
         for namespace in namespaces:
@@ -193,11 +186,8 @@ class Emitter:
 
         return message, rooms
 
-    def _emit_postgresql(self,event, msg):
+    def _emit_postgresql(self,event, msg, namespaces):
         from psycopg2._json import Json
-        if not self.namespace:
-            self.namespace = ["/"]
-        namespaces = list(set(self._flatten_list(self.namespace)))
         print("namespaces:", namespaces)
         for __namespace in namespaces:
             r_type = "event"  # Default type, might be overridden by binary or json
